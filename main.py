@@ -175,8 +175,11 @@ class Wispa:
 
     def inject_text(self, text):
         """Inject text into focused input using AppleScript."""
+        # Add a space after the text for continuous dictation
+        text_with_space = text + " "
+
         # Escape special characters for AppleScript
-        escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+        escaped = text_with_space.replace("\\", "\\\\").replace('"', '\\"')
 
         script = f'tell application "System Events" to keystroke "{escaped}"'
 
