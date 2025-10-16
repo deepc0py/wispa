@@ -20,14 +20,19 @@ from pynput import keyboard
 # ============================================================================
 
 # Hotkey combination - Set which keys to use (True = required, False = not used)
-USE_CMD = True      # Command key
-USE_OPTION = True   # Option/Alt key
-USE_CTRL = True     # Control key
-USE_SHIFT = False   # Shift key
+USE_CMD = True  # Command key
+USE_OPTION = True  # Option/Alt key
+USE_CTRL = True  # Control key
+USE_SHIFT = False  # Shift key
 
 # Model settings
 MODEL_SIZE = "small"  # Options: "tiny", "base", "small", "medium", "large-v3"
-LANGUAGE = "en"       # Language code (e.g., "en", "es", "fr") or None for auto-detect
+LANGUAGE = "en"  # Language code (e.g., "en", "es", "fr") or None for auto-detect
+
+# Audio feedback sounds (macOS system sounds)
+# Options: Tink, Pop, Basso, Blow, Bottle, Frog, Funk, Glass, Hero, Morse, Ping, Purr, Sosumi, Submarine
+START_SOUND = "Tink"  # Sound when recording starts
+STOP_SOUND = "Pop"  # Sound when recording stops
 
 # ============================================================================
 
@@ -81,14 +86,21 @@ class Wispa:
                 print(f"Audio status: {status}")
             self.audio_data.append(indata.copy())
 
-        # Start audio stream
+        # Start audio stream FIRST, before the beep
         self.stream = sd.InputStream(
             samplerate=self.sample_rate,
             channels=1,
             dtype=np.float32,
-            callback=audio_callback
+            callback=audio_callback,
         )
         self.stream.start()
+
+        # Audio feedback - play system beep (non-blocking)
+        subprocess.Popen(
+            ["afplay", f"/System/Library/Sounds/{START_SOUND}.aiff"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
 
     def stop_recording(self):
         """Stop recording and transcribe."""
@@ -101,6 +113,11 @@ class Wispa:
         if self.stream:
             self.stream.stop()
             self.stream.close()
+
+        # Audio feedback - different sound for stop
+        subprocess.run(
+            ["afplay", f"/System/Library/Sounds/{STOP_SOUND}.aiff"], check=False
+        )
 
         print("[STOP] Stopped recording, transcribing...")
 
@@ -123,7 +140,7 @@ class Wispa:
 
         try:
             # Write WAV file
-            with wave.open(temp_path, 'wb') as wf:
+            with wave.open(temp_path, "wb") as wf:
                 wf.setnchannels(1)
                 wf.setsampwidth(2)  # 16-bit
                 wf.setframerate(self.sample_rate)
@@ -139,7 +156,9 @@ class Wispa:
                 vad_filter=False,  # Disable VAD to see if it's filtering everything
             )
 
-            print(f"[DEBUG] Language detected: {info.language}, probability: {info.language_probability:.2f}")
+            print(
+                f"[DEBUG] Language detected: {info.language}, probability: {info.language_probability:.2f}"
+            )
 
             # Get transcription text
             text = " ".join([segment.text.strip() for segment in segments])
@@ -157,16 +176,13 @@ class Wispa:
     def inject_text(self, text):
         """Inject text into focused input using AppleScript."""
         # Escape special characters for AppleScript
-        escaped = text.replace('\\', '\\\\').replace('"', '\\"')
+        escaped = text.replace("\\", "\\\\").replace('"', '\\"')
 
         script = f'tell application "System Events" to keystroke "{escaped}"'
 
         try:
             subprocess.run(
-                ['osascript', '-e', script],
-                check=True,
-                capture_output=True,
-                text=True
+                ["osascript", "-e", script], check=True, capture_output=True, text=True
             )
         except subprocess.CalledProcessError as e:
             print(f"Failed to inject text: {e.stderr}")
@@ -186,21 +202,37 @@ class Wispa:
             nonlocal cmd_pressed, option_pressed, ctrl_pressed, shift_pressed
 
             # Check for modifier keys
-            if key == keyboard.Key.cmd or key == keyboard.Key.cmd_l or key == keyboard.Key.cmd_r:
+            if (
+                key == keyboard.Key.cmd
+                or key == keyboard.Key.cmd_l
+                or key == keyboard.Key.cmd_r
+            ):
                 cmd_pressed = True
-            elif key == keyboard.Key.alt or key == keyboard.Key.alt_l or key == keyboard.Key.alt_r:
+            elif (
+                key == keyboard.Key.alt
+                or key == keyboard.Key.alt_l
+                or key == keyboard.Key.alt_r
+            ):
                 option_pressed = True
-            elif key == keyboard.Key.ctrl or key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
+            elif (
+                key == keyboard.Key.ctrl
+                or key == keyboard.Key.ctrl_l
+                or key == keyboard.Key.ctrl_r
+            ):
                 ctrl_pressed = True
-            elif key == keyboard.Key.shift or key == keyboard.Key.shift_l or key == keyboard.Key.shift_r:
+            elif (
+                key == keyboard.Key.shift
+                or key == keyboard.Key.shift_l
+                or key == keyboard.Key.shift_r
+            ):
                 shift_pressed = True
 
             # Check if all required keys are pressed
             all_pressed = (
-                (not USE_CMD or cmd_pressed) and
-                (not USE_OPTION or option_pressed) and
-                (not USE_CTRL or ctrl_pressed) and
-                (not USE_SHIFT or shift_pressed)
+                (not USE_CMD or cmd_pressed)
+                and (not USE_OPTION or option_pressed)
+                and (not USE_CTRL or ctrl_pressed)
+                and (not USE_SHIFT or shift_pressed)
             )
 
             # Start recording when all required keys are pressed
@@ -211,21 +243,37 @@ class Wispa:
             nonlocal cmd_pressed, option_pressed, ctrl_pressed, shift_pressed
 
             # Track key releases
-            if key == keyboard.Key.cmd or key == keyboard.Key.cmd_l or key == keyboard.Key.cmd_r:
+            if (
+                key == keyboard.Key.cmd
+                or key == keyboard.Key.cmd_l
+                or key == keyboard.Key.cmd_r
+            ):
                 cmd_pressed = False
-            elif key == keyboard.Key.alt or key == keyboard.Key.alt_l or key == keyboard.Key.alt_r:
+            elif (
+                key == keyboard.Key.alt
+                or key == keyboard.Key.alt_l
+                or key == keyboard.Key.alt_r
+            ):
                 option_pressed = False
-            elif key == keyboard.Key.ctrl or key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
+            elif (
+                key == keyboard.Key.ctrl
+                or key == keyboard.Key.ctrl_l
+                or key == keyboard.Key.ctrl_r
+            ):
                 ctrl_pressed = False
-            elif key == keyboard.Key.shift or key == keyboard.Key.shift_l or key == keyboard.Key.shift_r:
+            elif (
+                key == keyboard.Key.shift
+                or key == keyboard.Key.shift_l
+                or key == keyboard.Key.shift_r
+            ):
                 shift_pressed = False
 
             # Check if all required keys are still pressed
             all_pressed = (
-                (not USE_CMD or cmd_pressed) and
-                (not USE_OPTION or option_pressed) and
-                (not USE_CTRL or ctrl_pressed) and
-                (not USE_SHIFT or shift_pressed)
+                (not USE_CMD or cmd_pressed)
+                and (not USE_OPTION or option_pressed)
+                and (not USE_CTRL or ctrl_pressed)
+                and (not USE_SHIFT or shift_pressed)
             )
 
             # Stop recording when any required key is released
