@@ -1,6 +1,7 @@
 # Wispa 🎤
 
 Fast, local voice-to-text for macOS using faster-whisper. Hold a hotkey to record, release to transcribe and inject text into any input field.
+The most simple privacy-focused voice-to-text solution for macOS.
 
 ## Features
 
