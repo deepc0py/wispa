@@ -6,6 +6,7 @@ Hold Command+Option+Control to record, release to transcribe and inject text
 
 import subprocess
 import tempfile
+import time
 import wave
 from pathlib import Path
 
@@ -283,8 +284,23 @@ class Wispa:
             if self.is_recording and not all_pressed:
                 self.stop_recording()
 
-        with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
-            listener.join()
+        # Start listener in a separate thread (non-blocking)
+        listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+        listener.start()
+
+        try:
+            # Use a sleep loop instead of blocking join()
+            # This allows keyboard interrupts to be caught promptly
+            while listener.is_alive():
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            # Stop the listener on keyboard interrupt
+            listener.stop()
+            raise
+        finally:
+            # Ensure cleanup happens
+            if listener.is_alive():
+                listener.stop()
 
 
 if __name__ == "__main__":
